@@ -1,0 +1,3 @@
+TYPEMAP
+
+fsp_link *  T_PTROBJ_MG
