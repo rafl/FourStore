@@ -13,8 +13,11 @@ new (class, const char *name, char *pw, int readonly=0)
   PREINIT:
     fsp_link *link;
     SV *obj, *self;
-  CODE:
-    link = fsp_open_link(name, pw, readonly);
+  PPCODE:
+    if (!(link = fsp_open_link(name, pw, readonly))) {
+      croak("foo");
+    }
+
     obj = (SV *)newHV();
     self = newRV_noinc(obj);
     sv_bless(self, gv_stashpvs("FourStore::Link", 0));
