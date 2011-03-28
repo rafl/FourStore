@@ -1,0 +1,8 @@
+.*
+!.gitignore
+FourStore-*
+Makefile*
+!Makefile.PL
+*blib
+FourStore.*
+!FourStore.xs
