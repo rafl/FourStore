@@ -4,8 +4,11 @@ use Test::More;
 
 use FourStore;
 
-my $link = FourStore::Link->new('foo', 'bar');
+my $link = FourStore::Link->new('moo', 'bar');
+isa_ok $link, 'FourStore::Link';
 
-diag $link->features;
+ok $link->features;
+
+diag $link->segments;
 
 done_testing;
