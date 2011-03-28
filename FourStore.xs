@@ -6,7 +6,7 @@
 
 #include "4store.h"
 
-MODULE = FourStore  PACKAGE = FourStore::Link  PREFIX = fsp_
+MODULE = FourStore  PACKAGE = FourStore::Link  PREFIX = fsp_link_
 
 void
 new (class, const char *name, char *pw, int readonly=0)
