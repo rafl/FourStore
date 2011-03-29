@@ -21,10 +21,9 @@ diag $vec->length;
 use Data::Dump 'pp';
 pp $vec->data;
 
-sub FS_BIND_SUBJECT () { 0x02 }
-sub FS_BIND_PREDICATE () { 0x04 }
-sub FS_BIND_OBJECT () { 0x08 }
-sub FS_BIND_BY_SUBJECT () { 0x1000000 }
+BEGIN {
+    diag FourStore::FS_BIND_SUBJECT();
+}
 
 pp $link->bind_limit_all(
     FS_BIND_SUBJECT | FS_BIND_PREDICATE | FS_BIND_OBJECT | FS_BIND_BY_SUBJECT,
