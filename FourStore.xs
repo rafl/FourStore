@@ -59,9 +59,8 @@ fsp_link_features (fsp_link *link)
 #fsp_bind_limit (fsp_link *link, fs_segment segment, int flags, fs_rid_vector *mrids, fs_rid_vector *srids, fs_rid_vector *prids, fs_rid_vector *orids, fs_rid_vector ***result, int offset, int limit)
 
 void
-bind_limit (link, segment, flags, mrids, srids, prids, orids, offset, limit)
+bind_limit_all (link, flags, mrids, srids, prids, orids, offset, limit)
     fsp_link *link
-    fs_segment segment
     int flags
     fs_rid_vector *mrids
     fs_rid_vector *srids
@@ -71,13 +70,20 @@ bind_limit (link, segment, flags, mrids, srids, prids, orids, offset, limit)
     int limit
   PREINIT:
     fs_rid_vector **result;
-  CODE:
-    if (fsp_bind_limit (link, segment, flags, mrids, srids, prids, orids, &result, offset, limit))
+    int k, cols = 0;
+  PPCODE:
+    if (fsp_bind_limit_all (link, flags, mrids, srids, prids, orids, &result, offset, limit))
       croak("moo");
 
     if (!result)
       XSRETURN_EMPTY;
 
+    for (k = 0; k < 4; ++k) {
+      if (flags & (1 << k)) {
+        XPUSHs(sv_2mortal(attach_struct(new_instance(gv_stashpvs("FourStore::RidVector", 0)), result[cols])));
+        cols++;
+      }
+    }
 
 MODULE = FourStore  PACKAGE = FourStore::RidVector  PREFIX = fs_rid_vector_
 
@@ -120,6 +126,18 @@ fs_rid_vector_copy(fs_rid_vector *v)
 
 U32
 fs_rid_vector_length (fs_rid_vector *v)
+
+AV *
+data (fs_rid_vector *v)
+  PREINIT:
+    int i, len;
+  CODE:
+    len = fs_rid_vector_length(v);
+    RETVAL = newAV();
+    for (i = 0; i < len; i++)
+      av_push(RETVAL, newSVuv(v->data[i]));
+  OUTPUT:
+    RETVAL
 
 void
 DESTROY (fs_rid_vector *v)
