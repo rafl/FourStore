@@ -6,23 +6,43 @@
 
 #include "4store.h"
 
+static SV *
+S_new_instance (pTHX_ HV *klass)
+{
+  SV *obj, *self;
+
+  obj = (SV *)newHV();
+  self = newRV_noinc(obj);
+  sv_bless(self, klass);
+
+  return self;
+}
+
+static SV *
+S_attach_struct (pTHX_ SV *obj, void *ptr)
+{
+  xs_object_magic_attach_struct(aTHX_ SvRV(obj), ptr);
+  return obj;
+}
+
+#define new_instance(klass)  S_new_instance(aTHX_ klass)
+#define attach_struct(obj, ptr)  S_attach_struct(aTHX_ obj, ptr)
+
 MODULE = FourStore  PACKAGE = FourStore::Link  PREFIX = fsp_link_
 
+PROTOTYPES: DISABLE
+
 void
-new (class, const char *name, char *pw, int readonly=0)
+new (klass, const char *name, char *pw, int readonly=0)
+    SV *klass
   PREINIT:
     fsp_link *link;
-    SV *obj, *self;
   PPCODE:
     if (!(link = fsp_open_link(name, pw, readonly))) {
       croak("foo");
     }
 
-    obj = (SV *)newHV();
-    self = newRV_noinc(obj);
-    sv_bless(self, gv_stashpvs("FourStore::Link", 0));
-    xs_object_magic_attach_struct(aTHX_ obj, link);
-    XPUSHs(self);
+    XPUSHs(attach_struct(new_instance(gv_stashsv(klass, 0)), link));
 
 void
 DESTROY (fsp_link *link)
@@ -34,3 +54,94 @@ fsp_link_segments (fsp_link *link)
 
 const char *
 fsp_link_features (fsp_link *link)
+
+#int
+#fsp_bind_limit (fsp_link *link, fs_segment segment, int flags, fs_rid_vector *mrids, fs_rid_vector *srids, fs_rid_vector *prids, fs_rid_vector *orids, fs_rid_vector ***result, int offset, int limit)
+
+void
+bind_limit (link, segment, flags, mrids, srids, prids, orids, offset, limit)
+    fsp_link *link
+    fs_segment segment
+    int flags
+    fs_rid_vector *mrids
+    fs_rid_vector *srids
+    fs_rid_vector *prids
+    fs_rid_vector *orids
+    int offset
+    int limit
+  PREINIT:
+    fs_rid_vector **result;
+  CODE:
+    if (fsp_bind_limit (link, segment, flags, mrids, srids, prids, orids, &result, offset, limit))
+      croak("moo");
+
+    if (!result)
+      XSRETURN_EMPTY;
+
+
+MODULE = FourStore  PACKAGE = FourStore::RidVector  PREFIX = fs_rid_vector_
+
+void
+new (class, length=0)
+    SV *class
+    int length
+  PREINIT:
+    fs_rid_vector *vec;
+  PPCODE:
+    vec = fs_rid_vector_new(length);
+    XPUSHs(attach_struct(new_instance(gv_stashsv(class, 0)), vec));
+
+void
+fs_rid_vector_append (vec, ...)
+    fs_rid_vector *vec
+  PREINIT:
+    int i;
+  CODE:
+    for (i = 0; i < items; i++) {
+      fs_rid_vector_append(vec, SvUV(ST(i)));
+    }
+
+void
+fs_rid_vector_append_vector (vec, ...)
+    fs_rid_vector *vec
+  PREINIT:
+    int i;
+  CODE:
+    for (i = 0; i < items; i++) {
+      fs_rid_vector_append_vector(vec, (fs_rid_vector *)xs_object_magic_get_struct_rv_pretty(aTHX_ ST(i), "$var"));
+    }
+
+SV *
+fs_rid_vector_copy(fs_rid_vector *v)
+  CODE:
+    RETVAL = attach_struct(new_instance(SvSTASH(SvRV(ST(0)))), fs_rid_vector_copy(v));
+  OUTPUT:
+    RETVAL
+
+U32
+fs_rid_vector_length (fs_rid_vector *v)
+
+void
+DESTROY (fs_rid_vector *v)
+  CODE:
+    fs_rid_vector_free(v);
+
+#int fsp_bind_limit_many (fsp_link *link,
+#                         int flags,
+#                         fs_rid_vector *mrids,
+#                         fs_rid_vector *srids,
+#                         fs_rid_vector *prids,
+#                         fs_rid_vector *orids,
+#                         fs_rid_vector ***result,
+#                         int offset,
+#                         int limit);
+
+#int fsp_bind_limit_all (fsp_link *link,
+#                  int flags,
+#                  fs_rid_vector *mrids,
+#                  fs_rid_vector *srids,
+#                  fs_rid_vector *prids,
+#                  fs_rid_vector *orids,
+#                  fs_rid_vector ***result,
+#                  int offset,
+#                  int limit);
