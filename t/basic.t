@@ -31,4 +31,6 @@ my @result = $link->bind_limit_all(
 is @result, 3;
 isa_ok($_, 'FourStore::RidVector') for @result;
 
+FourStore::Hash::hash_literal(0, 0);
+
 done_testing;

@@ -210,3 +210,8 @@ DESTROY (fs_rid_vector *v)
 #                  fs_rid_vector ***result,
 #                  int offset,
 #                  int limit);
+
+MODULE = FourStore  PACKAGE = FourStore::Hash  PREFIX = fs_
+
+fs_rid
+fs_hash_literal (const char *str, fs_rid attr)

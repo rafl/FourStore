@@ -4,3 +4,4 @@ fsp_link *  T_PTROBJ_MG
 fs_segment  T_UINT
 fs_rid_vector *  T_PTROBJ_MG
 fs_segment  T_UV
+fs_rid  T_UV
