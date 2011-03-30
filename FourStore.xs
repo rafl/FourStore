@@ -4,7 +4,7 @@
 
 #include "xs_object_magic.h"
 
-#include "4store.h"
+#include <4store.h>
 
 static SV *
 S_new_instance (pTHX_ HV *klass)
