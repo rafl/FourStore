@@ -132,6 +132,109 @@ bind_limit_all (link, flags, mrids, srids, prids, orids, offset, limit)
       }
     }
 
+void
+get_node (link, rid)
+    fsp_link *link
+    fs_rid rid
+  PREINIT:
+    int count;
+    SV* node;
+    int segments;
+    fs_rid attr;
+    fs_rid_vector onerid;
+    fs_resource resource, attr_resource;
+  PPCODE:
+    segments = fsp_link_segments(link);
+    onerid.length = 1;
+    onerid.size = 1;
+    onerid.data = &rid;
+    if (fsp_resolve(link, FS_RID_SEGMENT(rid, segments), &onerid, &resource)) {
+      croak("fsp_resolve failed in get_node");
+    }
+    
+    if (FS_IS_URI(rid)) {
+      PUSHMARK(SP);
+      XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Resource", (STRLEN) 0 )));
+      XPUSHs(sv_2mortal(newSVpv( resource.lex, 0 )));
+      PUTBACK;
+      count	= call_method("new", G_SCALAR);
+      SPAGAIN;
+      if (count != 1)
+        croak("Big trouble");
+      node = POPs;
+      SvREFCNT_inc( node );
+      XPUSHs(node);
+    } else if (FS_IS_BNODE(rid)) {
+      PUSHMARK(SP);
+      XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Blank", (STRLEN) 0 )));
+      XPUSHs(sv_2mortal(newSVpvf("fs%llu", FS_BNODE_NUM(rid))));
+      PUTBACK;
+      count	= call_method("new", G_SCALAR);
+      SPAGAIN;
+      if (count != 1)
+        croak("Big trouble");
+      node = POPs;
+      SvREFCNT_inc( node );
+      XPUSHs(node);
+    } else if (FS_IS_LITERAL(rid)) {
+      attr = resource.attr;
+      if (attr == 0) {
+        // plain literal
+        PUSHMARK(SP);
+        XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Literal", (STRLEN) 0 )));
+        XPUSHs(sv_2mortal(newSVpv(resource.lex, 0)));
+        PUTBACK;
+        count	= call_method("new", G_SCALAR);
+        SPAGAIN;
+        if (count != 1)
+          croak("Big trouble");
+        node = POPs;
+        SvREFCNT_inc( node );
+        XPUSHs(node);
+      } else if (FS_IS_URI(attr)) {
+        // datatype literal
+        onerid.data = &attr;
+        if (fsp_resolve(link, FS_RID_SEGMENT(attr, segments), &onerid, &attr_resource)) {
+          croak("get_attr failed");
+        }
+        PUSHMARK(SP);
+        XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Literal", (STRLEN) 0 )));
+        XPUSHs(sv_2mortal(newSVpv(resource.lex, 0)));
+        XPUSHs(&PL_sv_undef);
+        XPUSHs(sv_2mortal(newSVpv(attr_resource.lex, 0)));
+        PUTBACK;
+        count	= call_method("new", G_SCALAR);
+        SPAGAIN;
+        if (count != 1)
+          croak("Big trouble");
+        node = POPs;
+        SvREFCNT_inc( node );
+        XPUSHs(node);
+      } else if (FS_IS_LITERAL(attr)) {
+        // language literal
+        onerid.data = &attr;
+        if (fsp_resolve(link, FS_RID_SEGMENT(attr, segments), &onerid, &attr_resource)) {
+          croak("get_attr failed");
+        }
+        PUSHMARK(SP);
+        XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Literal", (STRLEN) 0 )));
+        XPUSHs(sv_2mortal(newSVpv(resource.lex, 0)));
+        XPUSHs(sv_2mortal(newSVpv(attr_resource.lex, 0)));
+        PUTBACK;
+        count	= call_method("new", G_SCALAR);
+        SPAGAIN;
+        if (count != 1)
+          croak("Big trouble");
+        node = POPs;
+        SvREFCNT_inc( node );
+        XPUSHs(node);
+      } else {
+        croak("unrecognized attribute rid type in get_node");
+      }
+    } else {
+      croak("unrecognized rid type in get_node");
+    }
+
 MODULE = FourStore  PACKAGE = FourStore::RidVector  PREFIX = fs_rid_vector_
 
 void
