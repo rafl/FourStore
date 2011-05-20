@@ -6,3 +6,4 @@ Makefile*
 *blib
 FourStore.*
 !FourStore.xs
+!FourStore.pm
