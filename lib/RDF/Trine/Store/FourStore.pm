@@ -150,7 +150,9 @@ sub get_statements {
 		my $vec	= $vectors[ ($i+1) % 4 ];
 		if (blessed($nodes[$i]) and not($nodes[$i]->is_variable)) {
 			my $node	= $nodes[ $i ];
-			$bind_flags	|= $bind_flags[ $i ];
+			unless ($bind_flags) {
+				$bind_flags	|= $bind_flags[ $i ];
+			}
 			if ($node->isa( 'RDF::Trine::Node::Resource')) {
 				my $rid	= FourStore::Hash::hash_uri( $node->uri_value );
 				$vec->append($rid);
@@ -171,29 +173,30 @@ sub get_statements {
 		}
 	}
 	
+	$bind_flags		||= FS_BIND_BY_SUBJECT;
 	my $flags		= FS_BIND_SUBJECT | FS_BIND_PREDICATE | FS_BIND_OBJECT | $bind_flags;
-	my ($sv, $pv, $ov) = $self->{'link'}->bind_limit_all(
+	if ($use_quad) {
+		$flags	|= FS_BIND_MODEL;
+	}
+	
+	# XXX need to set the FS_BIND_SAME_???? flags for any repeated nodes
+	
+	my @result_vectors = $self->{'link'}->bind_limit_all(
 		$flags,
 		@vectors,
 		-1,
 		-1,
 	);
 	
-	my $length		= $sv->length;
-	warn "$length results";
+	if ($use_quad) {
+		push(@result_vectors, shift(@result_vectors));	# move the graph vector to the end of the list
+	}
 	
-	my ($s, $p, $o)	= map { $_->data } ($sv, $pv, $ov);
+	my @arrays	= map { $_->data } @result_vectors;
 	my $sub		= sub {
-		return unless (scalar(@$s));
-		my @rids	= (
-			shift(@$s),
-			shift(@$p),
-			shift(@$o),
-		);
+		return unless (scalar(@{ $arrays[0] }));
+		my @rids	= map { shift(@$_) } @arrays;
 		my @triple	= map { $self->{'link'}->get_node( $_ ) } @rids;
-		if ($use_quad) {
-			push(@triple, $g);
-		}
 		my $st	= $st_class->new( @triple );
 		return $st;
 	};
@@ -209,7 +212,27 @@ the set of contexts of the stored quads.
 
 sub get_contexts {
 	my $self	= shift;
-	throw RDF::Trine::Error::UnimplementedError;
+	my @vectors	= map { FourStore::RidVector->new() } (1 .. 4);
+	my $flags	= FS_BIND_DISTINCT | FS_BIND_MODEL | FS_BIND_BY_SUBJECT;
+	my ($vector) = $self->{'link'}->bind_limit_all(
+		$flags,
+		@vectors,
+		-1,
+		-1,
+	);
+	
+	my $data	= $vector->data;
+	my %seen;
+	my $sub		= sub {
+		while (1) {
+			return unless (scalar(@$data));
+			my $rid	= shift(@$data);
+			next if ($seen{ $rid }++);
+			my $g	= $self->{'link'}->get_node( $rid );
+			return $g;
+		}
+	};
+	return RDF::Trine::Iterator->new( $sub );
 }
 
 =item C<< add_statement ( $statement [, $context] ) >>
@@ -287,7 +310,7 @@ __END__
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<< <gwilliams@cpan.org> >>.
+Please report any bugs or feature requests to the Perl+RDF mailing list at C<< <dev@perlrdf.org> >>.
 
 =head1 AUTHOR
 
