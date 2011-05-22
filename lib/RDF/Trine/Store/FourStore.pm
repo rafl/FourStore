@@ -141,7 +141,73 @@ sub get_statements {
 			$bound{ 3 }	= $g;
 		}
 	}
-
+	
+	my %same;
+	my $has_same	= 0;
+	my @pos	= qw(subject predicate object graph);
+	foreach my $i (0 .. $#nodes) {
+		my $n	= $nodes[ $i ];
+		if (blessed($n) and $n->is_variable) {
+			if ($same{ $n->name }{ count }++) {
+				$has_same++;
+			}
+			push(@{ $same{ $n->name }{ 'pos' } }, $i);
+		}
+	}
+	
+	my $same_flag	= FS_BIND_SAME_XXXX;
+	if ($has_same) {
+		my @vars	= keys %same;
+		if (scalar(@vars) == 1) {
+			my $v		= shift(@vars);
+			my @pos		= @{ $same{ $v }{ 'pos' } };
+			my $count	= scalar(@pos);
+			my %pos_cmp	= map { $_ => 1 } (0,1,2,3);
+			if ($count == 2) {
+				my $same_pos	= join('', @pos);
+				my %two_bound_flag	= (
+					'12'	=> FS_BIND_SAME_XXAA,
+					'02'	=> FS_BIND_SAME_XAXA,
+					'01'	=> FS_BIND_SAME_XAAX,
+					'23'	=> FS_BIND_SAME_AXXA,
+					'13'	=> FS_BIND_SAME_AXAX,
+					'03'	=> FS_BIND_SAME_AAXX,
+				);
+				$same_flag	= $two_bound_flag{ $same_pos };
+			} elsif ($count == 3) {
+				delete $pos_cmp{ $_ } for (@pos);
+				my ($missing_pos)	= keys %pos_cmp;
+				my @three_bound_flag	= (
+					FS_BIND_SAME_AXAA,
+					FS_BIND_SAME_AAXA,
+					FS_BIND_SAME_AAAX,
+					FS_BIND_SAME_XAAA,
+				);
+				$same_flag	= $three_bound_flag[ $missing_pos ];
+			} else {
+				$same_flag	= FS_BIND_SAME_AAAA;
+			}
+		} else {
+			my %vmap;
+			@vmap{ @vars }	= qw(A B);
+			my @same_ab;
+			foreach my $v (@vars) {
+				foreach my $i (@{ $same{ $v }{ 'pos' } }) {
+					$same_ab[$i]	= $vmap{$v};
+				}
+			}
+			unshift(@same_ab, pop(@same_ab));
+			my $same_ab	= join('', @same_ab);
+			if ($same_ab eq 'AABB' or $same_ab eq 'BBAA') {
+				$same_flag	= FS_BIND_SAME_AABB;
+			} elsif ($same_ab eq 'ABAB' or $same_ab eq 'BABA') {
+				$same_flag	= FS_BIND_SAME_ABAB;
+			} else {
+				$same_flag	= FS_BIND_SAME_ABBA;
+			}
+		}
+	}
+	
 	my $st_class	= ($use_quad) ? 'RDF::Trine::Statement::Quad' : 'RDF::Trine::Statement';
 	my @vectors	= map { FourStore::RidVector->new() } (1 .. 4);
 	my $bind_flags	= 0;
@@ -174,12 +240,10 @@ sub get_statements {
 	}
 	
 	$bind_flags		||= FS_BIND_BY_SUBJECT;
-	my $flags		= FS_BIND_SUBJECT | FS_BIND_PREDICATE | FS_BIND_OBJECT | $bind_flags;
+	my $flags		= FS_BIND_SUBJECT | FS_BIND_PREDICATE | FS_BIND_OBJECT | $bind_flags | $same_flag;
 	if ($use_quad) {
 		$flags	|= FS_BIND_MODEL;
 	}
-	
-	# XXX need to set the FS_BIND_SAME_???? flags for any repeated nodes
 	
 	my @result_vectors = $self->{'link'}->bind_limit_all(
 		$flags,
