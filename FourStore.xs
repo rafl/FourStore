@@ -151,7 +151,7 @@ get_node (link, rid)
     if (fsp_resolve(link, FS_RID_SEGMENT(rid, segments), &onerid, &resource)) {
       croak("fsp_resolve failed in get_node");
     }
-    
+
     if (FS_IS_URI(rid)) {
       PUSHMARK(SP);
       XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Resource", (STRLEN) 0 )));
