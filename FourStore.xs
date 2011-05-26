@@ -25,6 +25,44 @@ S_attach_struct (pTHX_ SV *obj, void *ptr)
   return obj;
 }
 
+static SV *
+new_node_instance (pTHX_ SV *klass, UV n_args, ...)
+{
+  int count;
+  va_list ap;
+  SV *ret;
+  dSP;
+
+  ENTER;
+  SAVETMPS;
+
+  PUSHMARK(SP);
+  EXTEND(SP, n_args + 1);
+  PUSHs(klass);
+
+  va_start(ap, n_args);
+  while (n_args--)
+    PUSHs(va_arg(ap, SV *));
+  va_end(ap);
+
+  PUTBACK;
+
+  count = call_method("new", G_SCALAR);
+
+  if (count != 1)
+    croak("Big trouble");
+
+  SPAGAIN;
+  ret = POPs;
+  SvREFCNT_inc(ret);
+
+  FREETMPS;
+  LEAVE;
+
+  return ret;
+}
+
+
 #define new_instance(klass)  S_new_instance(aTHX_ klass)
 #define attach_struct(obj, ptr)  S_attach_struct(aTHX_ obj, ptr)
 
@@ -137,7 +175,6 @@ get_node (link, rid)
     fsp_link *link
     fs_rid rid
   PREINIT:
-    int count;
     SV* node;
     int segments;
     fs_rid attr;
@@ -153,87 +190,46 @@ get_node (link, rid)
     }
 
     if (FS_IS_URI(rid)) {
-      PUSHMARK(SP);
-      XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Resource", (STRLEN) 0 )));
-      XPUSHs(sv_2mortal(newSVpv( resource.lex, 0 )));
-      PUTBACK;
-      count	= call_method("new", G_SCALAR);
-      SPAGAIN;
-      if (count != 1)
-        croak("Big trouble");
-      node = POPs;
-      SvREFCNT_inc( node );
-      XPUSHs(node);
+      node = new_node_instance(aTHX_ sv_2mortal(newSVpvs("RDF::Trine::Node::Resource")), 1,
+                               sv_2mortal(newSVpv(resource.lex, 0)));
     } else if (FS_IS_BNODE(rid)) {
-      PUSHMARK(SP);
-      XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Blank", (STRLEN) 0 )));
-      XPUSHs(sv_2mortal(newSVpvf("fs%llu", FS_BNODE_NUM(rid))));
-      PUTBACK;
-      count	= call_method("new", G_SCALAR);
-      SPAGAIN;
-      if (count != 1)
-        croak("Big trouble");
-      node = POPs;
-      SvREFCNT_inc( node );
-      XPUSHs(node);
+      node = new_node_instance(aTHX_ sv_2mortal(newSVpvs("RDF::Trine::Node::Blank")), 1,
+                   sv_2mortal(newSVpvf("fs%llu", FS_BNODE_NUM(rid))));
     } else if (FS_IS_LITERAL(rid)) {
       attr = resource.attr;
       if (attr == 0) {
         // plain literal
-        PUSHMARK(SP);
-        XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Literal", (STRLEN) 0 )));
-        XPUSHs(sv_2mortal(newSVpv(resource.lex, 0)));
-        PUTBACK;
-        count	= call_method("new", G_SCALAR);
-        SPAGAIN;
-        if (count != 1)
-          croak("Big trouble");
-        node = POPs;
-        SvREFCNT_inc( node );
-        XPUSHs(node);
+      node = new_node_instance(aTHX_ sv_2mortal(newSVpvs("RDF::Trine::Node::Literal")), 1,
+                               sv_2mortal(newSVpv(resource.lex, 0)));
       } else if (FS_IS_URI(attr)) {
         // datatype literal
         onerid.data = &attr;
         if (fsp_resolve(link, FS_RID_SEGMENT(attr, segments), &onerid, &attr_resource)) {
           croak("get_attr failed");
         }
-        PUSHMARK(SP);
-        XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Literal", (STRLEN) 0 )));
-        XPUSHs(sv_2mortal(newSVpv(resource.lex, 0)));
-        XPUSHs(&PL_sv_undef);
-        XPUSHs(sv_2mortal(newSVpv(attr_resource.lex, 0)));
-        PUTBACK;
-        count	= call_method("new", G_SCALAR);
-        SPAGAIN;
-        if (count != 1)
-          croak("Big trouble");
-        node = POPs;
-        SvREFCNT_inc( node );
-        XPUSHs(node);
+
+        node = new_node_instance(aTHX_ sv_2mortal(newSVpvs("RDF::Trine::Node::Literal")), 3,
+                                 sv_2mortal(newSVpv(resource.lex, 0)),
+                                 &PL_sv_undef,
+                                 sv_2mortal(newSVpv(attr_resource.lex, 0)));
       } else if (FS_IS_LITERAL(attr)) {
         // language literal
         onerid.data = &attr;
         if (fsp_resolve(link, FS_RID_SEGMENT(attr, segments), &onerid, &attr_resource)) {
           croak("get_attr failed");
         }
-        PUSHMARK(SP);
-        XPUSHs(sv_2mortal(newSVpv( "RDF::Trine::Node::Literal", (STRLEN) 0 )));
-        XPUSHs(sv_2mortal(newSVpv(resource.lex, 0)));
-        XPUSHs(sv_2mortal(newSVpv(attr_resource.lex, 0)));
-        PUTBACK;
-        count	= call_method("new", G_SCALAR);
-        SPAGAIN;
-        if (count != 1)
-          croak("Big trouble");
-        node = POPs;
-        SvREFCNT_inc( node );
-        XPUSHs(node);
+
+        node = new_node_instance(aTHX_ sv_2mortal(newSVpvs("RDF::Trine::Node::Literal")), 2,
+                                 sv_2mortal(newSVpv(resource.lex, 0)),
+                                 sv_2mortal(newSVpv(attr_resource.lex, 0)));
       } else {
         croak("unrecognized attribute rid type in get_node");
       }
     } else {
       croak("unrecognized rid type in get_node");
     }
+
+    XPUSHs(sv_2mortal(node));
 
 MODULE = FourStore  PACKAGE = FourStore::RidVector  PREFIX = fs_rid_vector_
 
