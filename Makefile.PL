@@ -12,4 +12,7 @@ WriteMakefile(
     NAME => 'FourStore',
     VERSION_FROM => 'lib/FourStore.pm',
     $deps->get_makefile_vars,
+    PREREQ_PM => {
+    	'Params::Util'	=> 0,
+    },
 );
